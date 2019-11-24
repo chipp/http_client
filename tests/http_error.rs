@@ -1,3 +1,4 @@
+use futures::executor::block_on;
 use http_client::{Error, HttpClient};
 use serde_derive::Deserialize;
 
@@ -8,7 +9,7 @@ fn test_404() {
 
     let http_client = HttpClient::new("https://httpbin.org/").unwrap();
 
-    match http_client.get::<Response>("/status/404").unwrap_err() {
+    match block_on(http_client.get::<Response>("/status/404")).unwrap_err() {
         Error::HttpError(404) => (),
         error => panic!(
             r#"assertion failed:

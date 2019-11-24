@@ -1,3 +1,4 @@
+use futures::executor::block_on;
 use http_client::HttpClient;
 use serde_derive::Deserialize;
 
@@ -11,9 +12,26 @@ fn test_get() {
     let http_client = HttpClient::new("https://httpbin.org/").unwrap();
 
     assert_eq!(
-        http_client.get::<Response>("/get").unwrap().url,
+        block_on(http_client.get::<Response>("/get")).unwrap().url,
         "https://httpbin.org/get"
     );
+}
+
+#[test]
+fn test_get_join() {
+    #[derive(Deserialize)]
+    struct Response {
+        url: String,
+    }
+
+    let http_client = HttpClient::new("https://httpbin.org/").unwrap();
+    let results = block_on(futures::future::join(
+        http_client.get::<Response>("/delay/2"),
+        http_client.get::<Response>("/delay/1"),
+    ));
+
+    assert_eq!(results.0.unwrap().url, "https://httpbin.org/delay/2");
+    assert_eq!(results.1.unwrap().url, "https://httpbin.org/delay/1");
 }
 
 #[test]
@@ -29,9 +47,8 @@ fn test_get_with_params() {
     let http_client = HttpClient::new("https://httpbin.org/").unwrap();
 
     let params = vec![("key1", "value1"), ("key2", "value2")];
-    let response = http_client
-        .get_with_params::<Response, _, _, _>("/get", params)
-        .unwrap();
+    let response =
+        block_on(http_client.get_with_params::<Response, _, _, _>("/get", params)).unwrap();
 
     assert_eq!(
         response.url,
