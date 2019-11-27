@@ -1,4 +1,4 @@
-use futures::executor::block_on;
+use futures_executor::block_on;
 use http_client::{Error, HttpClient};
 use serde_derive::Deserialize;
 

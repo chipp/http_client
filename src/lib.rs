@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 use std::thread;
 
-use futures::channel::oneshot;
+use futures_channel::oneshot;
 
 use serde::de::DeserializeOwned;
 use serde_json;
