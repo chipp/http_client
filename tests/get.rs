@@ -14,7 +14,9 @@ fn test_get() {
     let http_client = HttpClient::new(url.as_ref()).unwrap();
 
     assert_eq!(
-        block_on(http_client.get::<Response>("/get")).unwrap().url,
+        block_on(http_client.get::<Response, _>("/get"))
+            .unwrap()
+            .url,
         "https://httpbin.org/get"
     );
 }
@@ -28,8 +30,8 @@ fn test_get_join() {
 
     let http_client = HttpClient::new("https://httpbin.org/").unwrap();
     let results = block_on(futures::future::join(
-        http_client.get::<Response>("/delay/2"),
-        http_client.get::<Response>("/delay/1"),
+        http_client.get::<Response, _>("/delay/2"),
+        http_client.get::<Response, _>("/delay/1"),
     ));
 
     assert_eq!(results.0.unwrap().url, "https://httpbin.org/delay/2");
@@ -50,7 +52,7 @@ fn test_get_with_params() {
 
     let params = vec![("key1", "value1"), ("key2", "value2")];
     let response =
-        block_on(http_client.get_with_params::<Response, _, _, _>("/get", params)).unwrap();
+        block_on(http_client.get_with_params::<Response, _, _, _, _>("/get", params)).unwrap();
 
     assert_eq!(
         response.url,
@@ -87,7 +89,7 @@ fn test_interceptor() {
         easy.password("secure").unwrap();
     });
 
-    let response = block_on(http_client.get::<Response>("/basic-auth/me/secure")).unwrap();
+    let response = block_on(http_client.get::<Response, _>("/basic-auth/me/secure")).unwrap();
 
     assert_eq!(response.user, "me");
     assert!(response.authenticated);

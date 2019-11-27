@@ -49,13 +49,17 @@ impl<'a> HttpClient<'a> {
         self.interceptor = Some(Box::from(interceptor))
     }
 
-    pub async fn get<T: DeserializeOwned + Send + 'static>(&self, path: &str) -> Result<T, Error> {
+    pub async fn get<T: DeserializeOwned + Send + 'static, U>(&self, path: U) -> Result<T, Error>
+    where
+        U: AsRef<str>,
+    {
         self.do_get(self.prepare_url_with_path(path)).await
     }
 
-    pub async fn get_with_params<T, I, K, V>(&self, path: &str, iter: I) -> Result<T, Error>
+    pub async fn get_with_params<T, U, I, K, V>(&self, path: U, iter: I) -> Result<T, Error>
     where
         T: DeserializeOwned + Send + 'static,
+        U: AsRef<str>,
         I: IntoIterator,
         I::Item: Borrow<(K, V)>,
         K: AsRef<str>,
@@ -68,9 +72,12 @@ impl<'a> HttpClient<'a> {
 
     // Private API
 
-    fn prepare_url_with_path(&self, path: &str) -> Url {
+    fn prepare_url_with_path<U>(&self, path: U) -> Url
+    where
+        U: AsRef<str>,
+    {
         let mut url = self.base_url.clone();
-        url.set_path(path);
+        url.set_path(path.as_ref());
         url
     }
 
