@@ -28,14 +28,25 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-pub struct HttpClient {
+pub struct HttpClient<'a> {
     base_url: Url,
+    interceptor: Option<Box<dyn Fn(&mut Easy) + 'a>>,
 }
 
-impl HttpClient {
+impl<'a> HttpClient<'a> {
     pub fn new(base_url: &str) -> Result<HttpClient, ParseError> {
         let base_url = Url::parse(base_url)?;
-        Ok(HttpClient { base_url })
+        Ok(HttpClient {
+            base_url,
+            interceptor: None,
+        })
+    }
+
+    pub fn set_interceptor<F>(&mut self, interceptor: F)
+    where
+        F: Fn(&mut Easy) + 'a,
+    {
+        self.interceptor = Some(Box::from(interceptor))
     }
 
     pub async fn get<T: DeserializeOwned + Send + 'static>(&self, path: &str) -> Result<T, Error> {
@@ -66,11 +77,16 @@ impl HttpClient {
     async fn do_get<T: DeserializeOwned + Send + 'static>(&self, url: Url) -> Result<T, Error> {
         let (tx, rx) = oneshot::channel::<Result<T, Error>>();
 
-        thread::spawn(move || {
-            let mut response = Vec::new();
-            let mut easy = Easy::new();
-            easy.url(url.as_str()).unwrap();
+        let mut response = Vec::new();
+        let mut easy = Easy::new();
+        easy.url(url.as_str()).unwrap();
 
+        match self.interceptor {
+            Some(ref interceptor) => &interceptor(&mut easy),
+            None => &(),
+        };
+
+        thread::spawn(move || {
             {
                 let mut transfer = easy.transfer();
                 transfer

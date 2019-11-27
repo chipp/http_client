@@ -1,3 +1,4 @@
+use curl::easy::Auth;
 use futures::executor::block_on;
 use http_client::HttpClient;
 use serde_derive::Deserialize;
@@ -64,4 +65,29 @@ fn test_get_with_params() {
         .cloned()
         .collect()
     )
+}
+
+#[test]
+fn test_interceptor() {
+    #[derive(Deserialize)]
+    struct Response {
+        authenticated: bool,
+        user: String,
+    }
+
+    let mut http_client = HttpClient::new("https://httpbin.org/").unwrap();
+
+    http_client.set_interceptor(|easy: &mut curl::easy::Easy| {
+        let mut auth = Auth::new();
+        auth.basic(true);
+        easy.http_auth(&auth).unwrap();
+
+        easy.username("me").unwrap();
+        easy.password("secure").unwrap();
+    });
+
+    let response = block_on(http_client.get::<Response>("/basic-auth/me/secure")).unwrap();
+
+    assert_eq!(response.user, "me");
+    assert!(response.authenticated);
 }
