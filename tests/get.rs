@@ -10,7 +10,8 @@ fn test_get() {
         url: String,
     }
 
-    let http_client = HttpClient::new("https://httpbin.org/").unwrap();
+    let url = url::Url::parse("https://httpbin.org/").unwrap();
+    let http_client = HttpClient::new(url.as_ref()).unwrap();
 
     assert_eq!(
         block_on(http_client.get::<Response>("/get")).unwrap().url,

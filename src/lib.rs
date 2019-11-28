@@ -34,7 +34,7 @@ pub struct HttpClient<'a> {
 }
 
 impl<'a> HttpClient<'a> {
-    pub fn new(base_url: &str) -> Result<HttpClient, ParseError> {
+    pub fn new<'b>(base_url: &'b str) -> Result<HttpClient<'a>, ParseError> {
         let base_url = Url::parse(base_url)?;
         Ok(HttpClient {
             base_url,
