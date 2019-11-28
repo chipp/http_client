@@ -6,8 +6,12 @@ use futures_channel::oneshot;
 use serde::de::DeserializeOwned;
 use serde_json;
 
-use curl::easy::Easy;
+use ::curl::easy::Easy;
 use url::{ParseError, Url};
+
+pub mod curl {
+    pub use ::curl::*;
+}
 
 #[derive(Debug)]
 pub enum Error {
