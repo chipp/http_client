@@ -38,8 +38,11 @@ pub struct HttpClient<'a> {
 }
 
 impl<'a> HttpClient<'a> {
-    pub fn new<'b>(base_url: &'b str) -> Result<HttpClient<'a>, ParseError> {
-        let base_url = Url::parse(base_url)?;
+    pub fn new<U>(base_url: U) -> Result<HttpClient<'a>, ParseError>
+    where
+        U: AsRef<str>,
+    {
+        let base_url = Url::parse(base_url.as_ref())?;
         Ok(HttpClient {
             base_url,
             interceptor: None,
