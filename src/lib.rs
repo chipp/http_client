@@ -1,4 +1,4 @@
-use std::borrow::Borrow;
+use std::str;
 use std::thread;
 
 use futures_channel::oneshot;
@@ -9,15 +9,18 @@ use serde_json;
 use ::curl::easy::Easy;
 use url::{ParseError, Url};
 
+mod request;
+pub use request::{HttpMethod, Request};
+
 pub mod curl {
     pub use ::curl::*;
 }
 
 #[derive(Debug)]
 pub enum Error {
-    HttpError(u32),
+    HttpError(Response),
     CurlError(curl::Error),
-    ParseError(serde_json::Error),
+    JsonParseError(serde_json::Error),
 }
 
 impl From<curl::Error> for Error {
@@ -28,8 +31,15 @@ impl From<curl::Error> for Error {
 
 impl From<serde_json::Error> for Error {
     fn from(error: serde_json::Error) -> Error {
-        Error::ParseError(error)
+        Error::JsonParseError(error)
     }
+}
+
+#[derive(Debug)]
+pub struct Response {
+    pub status_code: u32,
+    pub body: Vec<u8>,
+    pub headers: Vec<String>,
 }
 
 pub struct HttpClient<'a> {
@@ -55,30 +65,9 @@ impl<'a> HttpClient<'a> {
     {
         self.interceptor = Some(Box::from(interceptor))
     }
+}
 
-    pub async fn get<T: DeserializeOwned + Send + 'static, U>(&self, path: U) -> Result<T, Error>
-    where
-        U: AsRef<str>,
-    {
-        self.do_get(self.prepare_url_with_path(path)).await
-    }
-
-    pub async fn get_with_params<T, U, I, K, V>(&self, path: U, iter: I) -> Result<T, Error>
-    where
-        T: DeserializeOwned + Send + 'static,
-        U: AsRef<str>,
-        I: IntoIterator,
-        I::Item: Borrow<(K, V)>,
-        K: AsRef<str>,
-        V: AsRef<str>,
-    {
-        let mut url = self.prepare_url_with_path(path);
-        url.query_pairs_mut().extend_pairs(iter);
-        self.do_get(url).await
-    }
-
-    // Private API
-
+impl<'a> HttpClient<'a> {
     fn prepare_url_with_path<U>(&self, path: U) -> Url
     where
         U: AsRef<str>,
@@ -88,44 +77,137 @@ impl<'a> HttpClient<'a> {
         url
     }
 
-    async fn do_get<T: DeserializeOwned + Send + 'static>(&self, url: Url) -> Result<T, Error> {
-        let (tx, rx) = oneshot::channel::<Result<T, Error>>();
-
-        let mut response = Vec::new();
+    pub async fn perform_request<R: Send + 'static, P>(
+        &self,
+        request: Request,
+        parse: P,
+    ) -> Result<R, Error>
+    where
+        P: Fn(Response) -> Result<R, Error> + Send + 'static,
+    {
+        let (tx, rx) = oneshot::channel::<Result<R, Error>>();
         let mut easy = Easy::new();
-        easy.url(url.as_str()).unwrap();
+        easy.url(request.url.as_str()).unwrap();
 
-        match self.interceptor {
-            Some(ref interceptor) => &interceptor(&mut easy),
-            None => &(),
-        };
+        match request.method {
+            HttpMethod::Get => (),
+            HttpMethod::Post => easy.post(true).unwrap(),
+        }
+
+        if let Some(form) = request.form {
+            easy.httppost(form).unwrap();
+        }
+
+        if let Some(body) = request.body {
+            easy.post_field_size(body.len() as u64).unwrap();
+            easy.post_fields_copy(&body).unwrap();
+        }
+
+        if let Some(headers) = request.headers {
+            easy.http_headers(headers).unwrap();
+        }
+
+        {
+            match self.interceptor {
+                Some(ref interceptor) => &interceptor(&mut easy),
+                None => &(),
+            };
+        }
 
         thread::spawn(move || {
+            let mut body = Vec::new();
+            let mut headers = Vec::new();
+
             {
                 let mut transfer = easy.transfer();
                 transfer
                     .write_function(|data| {
-                        response.extend_from_slice(data);
+                        body.extend_from_slice(data);
                         Ok(data.len())
                     })
                     .unwrap();
+
+                transfer
+                    .header_function(|header| {
+                        headers.push(str::from_utf8(header).unwrap().trim_end().to_string());
+                        true
+                    })
+                    .unwrap();
+
                 transfer.perform().unwrap();
             }
 
-            let code = easy.response_code().unwrap();
+            let status_code = easy.response_code().unwrap();
 
-            if code >= 200 && code < 300 {
-                let response: T = serde_json::from_slice(&response)
-                    .map_err(|err| Error::from(err))
-                    .unwrap();
-
-                let _ = tx.send(Ok(response));
-            } else {
-                eprintln!("{}", String::from_utf8_lossy(&response));
-                let _ = tx.send(Err(Error::HttpError(code)));
-            }
+            let _ = tx.send(parse(Response {
+                status_code,
+                body,
+                headers,
+            }));
         });
 
         rx.await.unwrap()
+    }
+}
+
+impl<'a> HttpClient<'a> {
+    pub fn new_request<P: AsRef<str>>(&self, path: P) -> Request {
+        Request::new(self.prepare_url_with_path(path))
+    }
+
+    pub fn new_request_with_params<P, I, K, V>(&self, path: P, params: I) -> Request
+    where
+        P: AsRef<str>,
+        I: IntoIterator,
+        I::Item: std::borrow::Borrow<(K, V)>,
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        let mut url = self.prepare_url_with_path(path);
+        url.query_pairs_mut().extend_pairs(params);
+
+        Request::new(url)
+    }
+
+    pub fn new_request_with_url(&self, url: Url) -> Request {
+        Request::new(url)
+    }
+}
+
+impl<'a> HttpClient<'a> {
+    pub async fn get<R: DeserializeOwned + Send + 'static, P: AsRef<str>>(
+        &self,
+        path: P,
+    ) -> Result<R, Error> {
+        self.perform_request(self.new_request(path), HttpClient::parse_json)
+            .await
+    }
+
+    pub async fn get_with_params<R, P, I, K, V>(&self, path: P, params: I) -> Result<R, Error>
+    where
+        R: DeserializeOwned + Send + 'static,
+        P: AsRef<str>,
+        I: IntoIterator,
+        I::Item: std::borrow::Borrow<(K, V)>,
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        self.perform_request(
+            self.new_request_with_params(path, params),
+            HttpClient::parse_json,
+        )
+        .await
+    }
+
+    pub fn parse_json<T: DeserializeOwned>(response: Response) -> Result<T, Error> {
+        if response.status_code >= 200 && response.status_code < 300 {
+            let response: T = serde_json::from_slice(&response.body)
+                .map_err(|err| Error::from(err))
+                .unwrap();
+
+            Ok(response)
+        } else {
+            Err(Error::HttpError(response))
+        }
     }
 }
