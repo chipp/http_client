@@ -9,7 +9,7 @@ fn test_404() {
 
     let http_client = HttpClient::new("https://httpbin.org/").unwrap();
 
-    match block_on(http_client.get::<Response, _>("/status/404")).unwrap_err() {
+    match block_on(http_client.get::<Response, _>(vec!["status", "404"])).unwrap_err() {
         Error::HttpError(response) => assert_eq!(response.status_code, 404),
         error => panic!(
             r#"assertion failed:

@@ -12,7 +12,7 @@ fn test_get() {
 
     let params = vec![("Location", "test")];
 
-    let request = http_client.new_request_with_params("/response-headers", params);
+    let request = http_client.new_request_with_params(vec!["response-headers"], params);
 
     let response = block_on(
         http_client.perform_request::<Response, _>(request, |response| {
