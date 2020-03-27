@@ -14,26 +14,9 @@ pub mod curl {
 }
 
 mod json;
-// pub use json::
 
-#[derive(Debug)]
-pub enum Error {
-    HttpError(Response),
-    CurlError(curl::Error),
-    JsonParseError(serde_json::Error),
-}
-
-impl From<curl::Error> for Error {
-    fn from(error: curl::Error) -> Error {
-        Error::CurlError(error)
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(error: serde_json::Error) -> Error {
-        Error::JsonParseError(error)
-    }
-}
+mod error;
+pub use error::Error;
 
 #[derive(Debug)]
 pub struct Response {
