@@ -3,11 +3,14 @@ use std::thread;
 
 use futures_channel::oneshot;
 
-use ::curl::easy::Easy;
+use ::curl::easy::{Easy, Form, List};
 use url::{ParseError, Url};
 
 mod request;
 pub use request::{HttpMethod, Request};
+
+mod response;
+pub use response::Response;
 
 pub mod curl {
     pub use ::curl::*;
@@ -17,13 +20,6 @@ mod json;
 
 mod error;
 pub use error::Error;
-
-#[derive(Debug)]
-pub struct Response {
-    pub status_code: u32,
-    pub body: Vec<u8>,
-    pub headers: Vec<String>,
-}
 
 pub struct HttpClient<'a> {
     base_url: Url,
@@ -67,7 +63,7 @@ impl<'a> HttpClient<'a> {
         parse: P,
     ) -> Result<R, Error>
     where
-        P: Fn(Response) -> Result<R, Error> + Send + 'static,
+        P: Fn(Request, Response) -> Result<R, Error> + Send + 'static,
     {
         let (tx, rx) = oneshot::channel::<Result<R, Error>>();
         let mut easy = Easy::new();
@@ -78,17 +74,31 @@ impl<'a> HttpClient<'a> {
             HttpMethod::Post => easy.post(true).unwrap(),
         }
 
-        if let Some(form) = request.form {
+        if let Some(form_params) = &request.form {
+            let mut form = Form::new();
+
+            for (k, v) in form_params {
+                let mut part = form.part(&k);
+                part.contents(v.as_bytes());
+                part.add().unwrap();
+            }
+
             easy.httppost(form).unwrap();
         }
 
-        if let Some(body) = request.body {
+        if let Some(body) = &request.body {
             easy.post_field_size(body.len() as u64).unwrap();
             easy.post_fields_copy(&body).unwrap();
         }
 
-        if let Some(headers) = request.headers {
-            easy.http_headers(headers).unwrap();
+        if let Some(headers) = &request.headers {
+            let mut list = List::new();
+
+            for header in headers {
+                list.append(&header).unwrap();
+            }
+
+            easy.http_headers(list).unwrap();
         }
 
         {
@@ -123,11 +133,14 @@ impl<'a> HttpClient<'a> {
 
             let status_code = easy.response_code().unwrap();
 
-            let _ = tx.send(parse(Response {
-                status_code,
-                body,
-                headers,
-            }));
+            let _ = tx.send(parse(
+                request,
+                Response {
+                    status_code,
+                    body,
+                    headers,
+                },
+            ));
         });
 
         rx.await.unwrap()

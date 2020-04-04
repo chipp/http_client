@@ -1,8 +1,7 @@
-use crate::Response;
+use crate::{Request, Response};
 
-#[derive(Debug)]
 pub enum Error {
-    HttpError(Response),
+    HttpError(Request, Response),
     CurlError(curl::Error),
     JsonParseError(serde_json::Error),
 }
@@ -21,20 +20,30 @@ impl From<serde_json::Error> for Error {
 
 use std::fmt;
 
+impl fmt::Debug for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Error::*;
+
+        match self {
+            CurlError(err) => curl::Error::fmt(err, f),
+            JsonParseError(err) => serde_json::Error::fmt(err, f),
+            HttpError(req, res) => f
+                .debug_struct("HttpError")
+                .field("request", &req)
+                .field("response", &res)
+                .finish(),
+        }
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Error::*;
 
         match self {
-            CurlError(err) => write!(f, "{}", err),
-            JsonParseError(err) => write!(f, "{}", err),
-            HttpError(err) => {
-                if let Ok(body) = String::from_utf8(err.body.clone()) {
-                    write!(f, "HTTP Error: {}\n{}", err.status_code, body)
-                } else {
-                    write!(f, "HTTP Error: {}", err.status_code)
-                }
-            }
+            CurlError(err) => curl::Error::fmt(err, f),
+            JsonParseError(err) => serde_json::Error::fmt(err, f),
+            HttpError(_, res) => write!(f, "HTTP Error: {}", res),
         }
     }
 }

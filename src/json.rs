@@ -1,4 +1,4 @@
-use super::{Error, HttpClient, Response};
+use super::{Error, HttpClient, Request, Response};
 use serde::de::DeserializeOwned;
 use serde_json;
 
@@ -28,14 +28,14 @@ impl<'a> HttpClient<'a> {
     }
 }
 
-pub fn parse_json<T: DeserializeOwned>(response: Response) -> Result<T, Error> {
-    if response.status_code >= 200 && response.status_code < 300 {
-        let response: T = serde_json::from_slice(&response.body)
+pub fn parse_json<T: DeserializeOwned>(req: Request, res: Response) -> Result<T, Error> {
+    if res.status_code >= 200 && res.status_code < 300 {
+        let response: T = serde_json::from_slice(&res.body)
             .map_err(|err| Error::from(err))
             .unwrap();
 
         Ok(response)
     } else {
-        Err(Error::HttpError(response))
+        Err(Error::HttpError(req, res))
     }
 }

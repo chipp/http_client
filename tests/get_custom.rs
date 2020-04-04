@@ -14,8 +14,9 @@ fn test_get() {
 
     let request = http_client.new_request_with_params(vec!["response-headers"], params);
 
-    let response = block_on(
-        http_client.perform_request::<Response, _>(request, |response| {
+    let response = block_on(http_client.perform_request::<Response, _>(
+        request,
+        |_request, response| {
             let mut location = None;
 
             for header in response.headers.iter() {
@@ -31,8 +32,8 @@ fn test_get() {
                     .expect("Location header wasn't received")
                     .to_string(),
             })
-        }),
-    )
+        },
+    ))
     .unwrap();
 
     assert_eq!(response.location, "test");
