@@ -19,7 +19,7 @@ fn test_get() {
             let mut location = None;
 
             for header in response.headers.iter() {
-                if header.starts_with("Location: ") {
+                if header.starts_with("location: ") {
                     let (_, value) = header.split_at("Location: ".len());
                     location = Some(value);
                     break;
@@ -27,7 +27,9 @@ fn test_get() {
             }
 
             Ok(Response {
-                location: location.unwrap().to_string(),
+                location: location
+                    .expect("Location header wasn't received")
+                    .to_string(),
             })
         }),
     )
