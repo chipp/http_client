@@ -7,6 +7,7 @@ pub struct Request {
     pub headers: Option<Vec<String>>,
     pub form: Option<Vec<(String, String)>>,
     pub body: Option<Vec<u8>>,
+    pub retry_count: Option<u8>,
 }
 
 use std::fmt;
@@ -40,6 +41,7 @@ impl Request {
             form: None,
             headers: None,
             body: None,
+            retry_count: None,
         }
     }
 }
@@ -96,6 +98,10 @@ impl Request {
         }
 
         self.body = Some(serializer.finish().into_bytes())
+    }
+
+    pub fn set_retry_count(&mut self, retry_count: u8) {
+        self.retry_count = Some(retry_count)
     }
 }
 

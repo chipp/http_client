@@ -112,7 +112,11 @@ impl<'a> HttpClient<'a> {
             let mut body = Vec::new();
             let mut headers = Vec::new();
 
-            {
+            let mut attempts = 0;
+
+            loop {
+                attempts += 1;
+
                 let mut transfer = easy.transfer();
                 transfer
                     .write_function(|data| {
@@ -128,7 +132,17 @@ impl<'a> HttpClient<'a> {
                     })
                     .unwrap();
 
-                transfer.perform().unwrap();
+                match transfer.perform() {
+                    Ok(()) => break,
+                    Err(err) => {
+                        if let Some(retry_count) = request.retry_count {
+                            if attempts == retry_count {
+                                eprintln!("{}", err);
+                                break;
+                            }
+                        }
+                    }
+                }
             }
 
             let status_code = easy.response_code().unwrap();
