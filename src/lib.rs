@@ -16,7 +16,7 @@ pub mod curl {
     pub use ::curl::*;
 }
 
-mod json;
+pub mod json;
 
 mod error;
 pub use error::Error;
