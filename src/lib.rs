@@ -113,6 +113,7 @@ impl<'a> HttpClient<'a> {
             let mut headers = Vec::new();
 
             let mut attempts = 0;
+            let mut transfer_error = None;
 
             loop {
                 attempts += 1;
@@ -135,26 +136,28 @@ impl<'a> HttpClient<'a> {
                 match transfer.perform() {
                     Ok(()) => break,
                     Err(err) => {
-                        if let Some(retry_count) = request.retry_count {
-                            if attempts == retry_count {
-                                eprintln!("{}", err);
-                                break;
-                            }
+                        if request.retry_count.is_none() || request.retry_count == Some(attempts) {
+                            transfer_error = Some(err);
+                            break;
                         }
                     }
                 }
             }
 
-            let status_code = easy.response_code().unwrap();
+            if let Some(err) = transfer_error {
+                let _ = tx.send(Err((request, err).into()));
+            } else {
+                let status_code = easy.response_code().unwrap();
 
-            let _ = tx.send(parse(
-                request,
-                Response {
-                    status_code,
-                    body,
-                    headers,
-                },
-            ));
+                let _ = tx.send(parse(
+                    request,
+                    Response {
+                        status_code,
+                        body,
+                        headers,
+                    },
+                ));
+            }
         });
 
         rx.await.unwrap()
