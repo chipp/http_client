@@ -19,7 +19,7 @@ pub mod curl {
 pub mod json;
 
 mod error;
-pub use error::Error;
+pub use error::{Error, ErrorKind};
 
 pub struct HttpClient<'a> {
     base_url: Url,

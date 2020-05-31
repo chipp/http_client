@@ -30,10 +30,8 @@ impl<'a> HttpClient<'a> {
 
 pub fn parse_json<T: DeserializeOwned>(req: Request, res: Response) -> Result<T, Error> {
     if res.status_code >= 200 && res.status_code < 300 {
-        serde_json::from_slice(&res.body)
-            .map_err(|err| Error::from(err))
-            .into()
+        serde_json::from_slice(&res.body).map_err(|err| Error::from((req, err)))
     } else {
-        Err(Error::HttpError(req, res))
+        Err((req, res).into())
     }
 }

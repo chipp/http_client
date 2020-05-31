@@ -1,20 +1,40 @@
 use crate::{Request, Response};
 
-pub enum Error {
-    HttpError(Request, Response),
+pub struct Error {
+    pub request: Request,
+    pub kind: ErrorKind,
+}
+
+pub enum ErrorKind {
+    HttpError(Response),
     CurlError(curl::Error),
     JsonParseError(serde_json::Error),
 }
 
-impl From<curl::Error> for Error {
-    fn from(error: curl::Error) -> Error {
-        Error::CurlError(error)
+impl From<(Request, curl::Error)> for Error {
+    fn from(pair: (Request, curl::Error)) -> Error {
+        Error {
+            request: pair.0,
+            kind: ErrorKind::CurlError(pair.1),
+        }
     }
 }
 
-impl From<serde_json::Error> for Error {
-    fn from(error: serde_json::Error) -> Error {
-        Error::JsonParseError(error)
+impl From<(Request, serde_json::Error)> for Error {
+    fn from(pair: (Request, serde_json::Error)) -> Error {
+        Error {
+            request: pair.0,
+            kind: ErrorKind::JsonParseError(pair.1),
+        }
+    }
+}
+
+impl From<(Request, Response)> for Error {
+    fn from(pair: (Request, Response)) -> Error {
+        Error {
+            request: pair.0,
+            kind: ErrorKind::HttpError(pair.1),
+        }
     }
 }
 
@@ -22,15 +42,23 @@ use std::fmt;
 
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Error::*;
+        use ErrorKind::*;
 
-        match self {
-            CurlError(err) => curl::Error::fmt(err, f),
-            JsonParseError(err) => serde_json::Error::fmt(err, f),
-            HttpError(req, res) => f
+        match &self.kind {
+            CurlError(err) => f
+                .debug_struct("CurlError")
+                .field("request", &self.request)
+                .field("error", &err)
+                .finish(),
+            JsonParseError(err) => f
+                .debug_struct("JsonParseError")
+                .field("request", &self.request)
+                .field("error", &err)
+                .finish(),
+            HttpError(response) => f
                 .debug_struct("HttpError")
-                .field("request", &req)
-                .field("response", &res)
+                .field("request", &self.request)
+                .field("response", &response)
                 .finish(),
         }
     }
@@ -38,12 +66,12 @@ impl fmt::Debug for Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Error::*;
+        use ErrorKind::*;
 
-        match self {
-            CurlError(err) => curl::Error::fmt(err, f),
-            JsonParseError(err) => serde_json::Error::fmt(err, f),
-            HttpError(_, res) => write!(f, "HTTP Error: {}", res),
+        match &self.kind {
+            CurlError(err) => curl::Error::fmt(&err, f),
+            JsonParseError(err) => serde_json::Error::fmt(&err, f),
+            HttpError(res) => write!(f, "HTTP Error: {}", res),
         }
     }
 }
