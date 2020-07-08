@@ -1,4 +1,5 @@
 use crate::{Request, Response};
+use std::error::Error as StdError;
 
 pub struct Error {
     pub request: Request,
@@ -37,6 +38,8 @@ impl From<(Request, Response)> for Error {
         }
     }
 }
+
+impl StdError for Error {}
 
 use std::fmt;
 
