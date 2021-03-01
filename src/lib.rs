@@ -23,7 +23,7 @@ pub use error::{Error, ErrorKind};
 
 pub struct HttpClient<'a> {
     base_url: Url,
-    interceptor: Option<Box<dyn Fn(&mut Easy) + 'a>>,
+    interceptor: Option<Box<dyn Fn(&mut Easy) + Send + Sync + 'a>>,
 }
 
 impl<'a> HttpClient<'a> {
@@ -40,9 +40,9 @@ impl<'a> HttpClient<'a> {
 
     pub fn set_interceptor<F>(&mut self, interceptor: F)
     where
-        F: Fn(&mut Easy) + 'a,
+        F: Fn(&mut Easy) + Send + Sync + 'a,
     {
-        self.interceptor = Some(Box::from(interceptor))
+        self.interceptor = Some(Box::new(interceptor))
     }
 }
 
