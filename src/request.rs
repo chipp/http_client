@@ -16,7 +16,7 @@ impl fmt::Debug for Request {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Request")
             .field("method", &self.method)
-            .field("url", &self.url)
+            .field("url", &self.url.to_string())
             .finish()
     }
 }
@@ -98,6 +98,12 @@ impl Request {
         }
 
         self.body = Some(serializer.finish().into_bytes())
+    }
+
+    pub fn set_json_body<J: serde::Serialize>(&mut self, json: &J) {
+        let body = serde_json::to_vec(&json).expect("valid json argument");
+        self.body = Some(body);
+        self.add_header("Content-Type", "application/json")
     }
 
     pub fn set_retry_count(&mut self, retry_count: u8) {

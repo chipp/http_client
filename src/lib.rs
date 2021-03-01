@@ -192,3 +192,11 @@ impl<'a> HttpClient<'a> {
         Request::new(url)
     }
 }
+
+pub fn parse_void(req: Request, res: Response) -> Result<(), Error> {
+    if res.status_code >= 200 && res.status_code < 300 {
+        Ok(())
+    } else {
+        Err((req, res).into())
+    }
+}
