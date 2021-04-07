@@ -6,6 +6,8 @@ use futures_channel::oneshot;
 use ::curl::easy::{Easy, Form, List};
 use url::{ParseError, Url};
 
+mod hexdump;
+
 mod request;
 pub use request::{HttpMethod, Request};
 

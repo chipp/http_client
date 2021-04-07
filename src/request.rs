@@ -1,5 +1,9 @@
 use std::borrow::Borrow;
+use std::fmt;
+
 use url::Url;
+
+use crate::hexdump::hexdump;
 
 pub struct Request {
     pub url: Url,
@@ -10,14 +14,28 @@ pub struct Request {
     pub retry_count: Option<u8>,
 }
 
-use std::fmt;
-
 impl fmt::Debug for Request {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Request")
+        let alternate = f.alternate();
+
+        let mut debug = f.debug_struct("Request");
+        debug
             .field("method", &self.method)
-            .field("url", &self.url.to_string())
-            .finish()
+            .field("url", &self.url.to_string());
+
+        if let Some(body) = self.body.as_ref() {
+            if alternate {
+                debug.finish()?;
+
+                writeln!(f)?;
+                hexdump(body, f)
+            } else {
+                debug.field("body", &format!("{} bytes", body.len()));
+                debug.finish()
+            }
+        } else {
+            debug.finish()
+        }
     }
 }
 
@@ -36,7 +54,7 @@ impl Default for HttpMethod {
 impl Request {
     pub fn new(url: Url) -> Request {
         Request {
-            url: url,
+            url,
             method: HttpMethod::default(),
             form: None,
             headers: None,

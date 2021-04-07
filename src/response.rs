@@ -1,23 +1,28 @@
+use std::fmt;
+
+use crate::hexdump::hexdump;
+
 pub struct Response {
     pub status_code: u32,
     pub body: Vec<u8>,
     pub headers: Vec<String>,
 }
 
-use std::fmt;
-
 impl fmt::Debug for Response {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut debug = f.debug_struct("Response");
 
-        if let Ok(body) = String::from_utf8(self.body.clone()) {
-            debug.field("body", &body);
-        }
-
         debug
             .field("status_code", &self.status_code)
             .field("headers", &self.headers)
-            .finish()
+            .finish()?;
+
+        if !self.body.is_empty() {
+            writeln!(f)?;
+            hexdump(&self.body, f)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -25,11 +30,11 @@ impl fmt::Display for Response {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Status: {}", self.status_code)?;
 
-        if let Ok(body) = std::str::from_utf8(&self.body) {
-            write!(f, "Body: {}", body)?;
+        if !self.body.is_empty() {
+            hexdump(&self.body, f)
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 }
 
