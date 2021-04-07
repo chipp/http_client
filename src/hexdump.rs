@@ -5,6 +5,10 @@ pub fn hexdump(data: &[u8], f: &mut fmt::Formatter) -> fmt::Result {
     let mut count = 0;
 
     for chunk in data.chunks(16) {
+        if count != 0 {
+            writeln!(f)?;
+        }
+
         write!(f, "{:08x}  ", count)?;
         count += chunk.len();
 
@@ -34,10 +38,10 @@ pub fn hexdump(data: &[u8], f: &mut fmt::Formatter) -> fmt::Result {
             }
         }
 
-        writeln!(f, "|")?;
+        write!(f, "|")?;
 
         width = 0;
     }
 
-    writeln!(f)
+    Ok(())
 }

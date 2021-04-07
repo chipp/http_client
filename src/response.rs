@@ -52,7 +52,8 @@ mod tests {
 
         assert_eq!(
             format!("{:?}", res),
-            r#"Response { body: "Not Found!!!", status_code: 404, headers: ["X-Custom: None"] }"#
+            r#"Response { status_code: 404, headers: ["X-Custom: None"] }
+00000000  4e 6f 74 20 46 6f 75 6e  64 21 21 21              |Not.Found!!!|"#
         );
     }
 
@@ -64,6 +65,10 @@ mod tests {
             headers: vec!["X-Custom: None".to_string()],
         };
 
-        assert_eq!(format!("{}", res), "Status: 404\nBody: Not Found!!!");
+        assert_eq!(
+            format!("{}", res),
+            r#"Status: 404
+00000000  4e 6f 74 20 46 6f 75 6e  64 21 21 21              |Not.Found!!!|"#
+        );
     }
 }
