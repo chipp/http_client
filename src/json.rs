@@ -2,7 +2,7 @@ use super::{Error, HttpClient, Request, Response};
 use serde::de::DeserializeOwned;
 use serde_json;
 
-impl<'a> HttpClient<'a> {
+impl HttpClient<'_> {
     pub async fn get<R, P>(&self, path: P) -> Result<R, Error>
     where
         R: DeserializeOwned + Send + 'static,

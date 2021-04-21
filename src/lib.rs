@@ -1,5 +1,5 @@
-use std::str;
 use std::thread;
+use std::{borrow::Borrow, str};
 
 use futures_channel::oneshot;
 
@@ -25,6 +25,7 @@ pub use error::{Error, ErrorKind};
 
 pub struct HttpClient<'a> {
     base_url: Url,
+    default_headers: Option<Vec<(String, String)>>,
     interceptor: Option<Box<dyn Fn(&mut Easy) + Send + Sync + 'a>>,
 }
 
@@ -36,8 +37,26 @@ impl<'a> HttpClient<'a> {
         let base_url = Url::parse(base_url.as_ref())?;
         Ok(HttpClient {
             base_url,
+            default_headers: None,
             interceptor: None,
         })
+    }
+
+    pub fn set_default_headers<H, K, V>(&mut self, headers: H)
+    where
+        H: IntoIterator,
+        H::Item: Borrow<(K, V)>,
+        K: ToString,
+        V: ToString,
+    {
+        let mut default_headers = vec![];
+
+        for pair in headers.into_iter() {
+            let (k, v) = pair.borrow();
+            default_headers.push((k.to_string(), v.to_string()));
+        }
+
+        self.default_headers = Some(default_headers)
     }
 
     pub fn set_interceptor<F>(&mut self, interceptor: F)
@@ -48,7 +67,7 @@ impl<'a> HttpClient<'a> {
     }
 }
 
-impl<'a> HttpClient<'a> {
+impl HttpClient<'_> {
     fn prepare_url_with_path<P>(&self, path: P) -> Url
     where
         P: IntoIterator,
@@ -93,15 +112,17 @@ impl<'a> HttpClient<'a> {
             easy.post_fields_copy(&body).unwrap();
         }
 
-        if let Some(headers) = &request.headers {
-            let mut list = List::new();
+        let mut headers = List::new();
 
-            for header in headers {
-                list.append(&header).unwrap();
-            }
-
-            easy.http_headers(list).unwrap();
+        if let Some(default_headers) = &self.default_headers {
+            add_headers_to_list(default_headers, &mut headers);
         }
+
+        if let Some(request_headers) = &request.headers {
+            add_headers_to_list(request_headers, &mut headers);
+        }
+
+        easy.http_headers(headers).unwrap();
 
         {
             match self.interceptor {
@@ -166,7 +187,7 @@ impl<'a> HttpClient<'a> {
     }
 }
 
-impl<'a> HttpClient<'a> {
+impl HttpClient<'_> {
     pub fn new_request<P>(&self, path: P) -> Request
     where
         P: IntoIterator,
@@ -200,5 +221,19 @@ pub fn parse_void(req: Request, res: Response) -> Result<(), Error> {
         Ok(())
     } else {
         Err((req, res).into())
+    }
+}
+
+fn add_headers_to_list<H, K, V>(headers: H, list: &mut List)
+where
+    H: IntoIterator,
+    H::Item: Borrow<(K, V)>,
+    K: AsRef<str>,
+    V: AsRef<str>,
+{
+    for pair in headers {
+        let (header, value) = pair.borrow();
+        list.append(&format!("{}: {}", header.as_ref(), value.as_ref()))
+            .unwrap();
     }
 }

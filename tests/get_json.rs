@@ -131,3 +131,22 @@ fn test_interceptor() {
     assert_eq!(response.user, "me");
     assert!(response.authenticated);
 }
+
+#[test]
+fn test_default_headers() {
+    #[derive(Deserialize)]
+    struct Response {
+        headers: std::collections::HashMap<String, String>,
+    }
+
+    let mut http_client = HttpClient::new("https://httpbin.org/").unwrap();
+
+    http_client.set_default_headers(&[("Authorization", "Bearer kek")]);
+
+    let response = block_on(http_client.get::<Response, _>(vec!["get"])).unwrap();
+
+    assert_eq!(
+        response.headers.get("Authorization"),
+        Some(&"Bearer kek".to_owned())
+    );
+}

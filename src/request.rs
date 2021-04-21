@@ -8,7 +8,7 @@ use crate::hexdump::hexdump;
 pub struct Request {
     pub url: Url,
     pub method: HttpMethod,
-    pub headers: Option<Vec<String>>,
+    pub headers: Option<Vec<(String, String)>>,
     pub form: Option<Vec<(String, String)>>,
     pub body: Option<Vec<u8>>,
     pub retry_count: Option<u8>,
@@ -52,7 +52,7 @@ impl Default for HttpMethod {
 }
 
 impl Request {
-    pub fn new(url: Url) -> Request {
+    pub fn new<'r>(url: Url) -> Request {
         Request {
             url,
             method: HttpMethod::default(),
@@ -71,8 +71,8 @@ impl Request {
 
     pub fn add_header<H, V>(&mut self, header: H, value: V)
     where
-        H: AsRef<str>,
-        V: AsRef<str>,
+        H: ToString,
+        V: ToString,
     {
         if let None = self.headers {
             self.headers = Some(vec![]);
@@ -81,21 +81,21 @@ impl Request {
         self.headers
             .as_mut()
             .unwrap()
-            .push(format!("{}: {}", header.as_ref(), value.as_ref()));
+            .push((header.to_string(), value.to_string()));
     }
 
     pub fn set_form<I, K, V>(&mut self, form_iter: I)
     where
         I: IntoIterator,
         I::Item: Borrow<(K, V)>,
-        K: AsRef<str>,
-        V: AsRef<str>,
+        K: ToString,
+        V: ToString,
     {
         let mut form = vec![];
 
         for pair in form_iter.into_iter() {
             let &(ref k, ref v) = pair.borrow();
-            form.push((String::from(k.as_ref()), String::from(v.as_ref())));
+            form.push((k.to_string(), v.to_string()));
         }
 
         self.form = Some(form)
