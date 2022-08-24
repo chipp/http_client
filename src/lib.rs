@@ -6,6 +6,8 @@ use futures_channel::oneshot;
 use ::curl::easy::{Easy, Form, List};
 use url::{ParseError, Url};
 
+use log::trace;
+
 mod hexdump;
 
 mod request;
@@ -162,6 +164,17 @@ impl HttpClient<'_> {
                         if request.retry_count.is_none() || request.retry_count == Some(attempts) {
                             transfer_error = Some(err);
                             break;
+                        } else {
+                            let delay = (attempts as f64) * 0.5 + 1_f64;
+                            let delay = delay.exp() * 1000_f64;
+
+                            trace!(
+                                "request {:?} finished with error, will repeat in {} ms",
+                                request.url.as_str(),
+                                delay as u64
+                            );
+
+                            std::thread::sleep(std::time::Duration::from_millis(delay as u64))
                         }
                     }
                 }
