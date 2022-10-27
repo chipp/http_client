@@ -165,16 +165,15 @@ impl HttpClient<'_> {
                             transfer_error = Some(err);
                             break;
                         } else {
-                            let delay = (attempts as f64) * 0.5 + 1_f64;
-                            let delay = delay.exp() * 1000_f64;
+                            let delay = delay_for_attempt(attempts);
 
                             trace!(
                                 "request {:?} finished with error, will repeat in {} ms",
                                 request.url.as_str(),
-                                delay as u64
+                                delay
                             );
 
-                            std::thread::sleep(std::time::Duration::from_millis(delay as u64))
+                            std::thread::sleep(std::time::Duration::from_millis(delay))
                         }
                     }
                 }
@@ -248,5 +247,23 @@ where
         let (header, value) = pair.borrow();
         list.append(&format!("{}: {}", header.as_ref(), value.as_ref()))
             .unwrap();
+    }
+}
+
+fn delay_for_attempt(attempt: u8) -> u64 {
+    let delay = (attempt as f64) * 0.5 + 1_f64;
+    let delay = delay.exp() * 100_f64;
+    delay as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_delay() {
+        assert_eq!(delay_for_attempt(1), 448);
+        assert_eq!(delay_for_attempt(2), 738);
+        assert_eq!(delay_for_attempt(3), 1218);
     }
 }
