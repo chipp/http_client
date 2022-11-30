@@ -43,6 +43,8 @@ impl fmt::Debug for Request {
 pub enum HttpMethod {
     Get,
     Post,
+    Put,
+    Delete,
 }
 
 impl Default for HttpMethod {

@@ -95,6 +95,8 @@ impl HttpClient<'_> {
         match request.method {
             HttpMethod::Get => (),
             HttpMethod::Post => easy.post(true).unwrap(),
+            HttpMethod::Put => easy.custom_request("PUT").unwrap(),
+            HttpMethod::Delete => easy.custom_request("DELETE").unwrap(),
         }
 
         if let Some(form_params) = &request.form {
