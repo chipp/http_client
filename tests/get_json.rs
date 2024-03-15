@@ -1,8 +1,8 @@
+use chipp_http::HttpClient;
 use curl::easy::Auth;
 use futures_executor::block_on;
 use futures_util::future::join_all;
 use futures_util::join;
-use http_client::HttpClient;
 use serde_derive::Deserialize;
 
 #[test]

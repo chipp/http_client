@@ -1,5 +1,5 @@
+use chipp_http::{ErrorKind, HttpClient, HttpMethod};
 use futures_executor::block_on;
-use http_client::{ErrorKind, HttpClient, HttpMethod};
 use serde_derive::Deserialize;
 
 #[test]

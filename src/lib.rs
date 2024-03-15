@@ -1,10 +1,11 @@
 use std::thread;
 use std::{borrow::Borrow, str};
 
+use error::UrlParseError;
 use futures_channel::oneshot;
 
 use ::curl::easy::{Easy, Form, List};
-use url::{ParseError, Url};
+use url::Url;
 
 use log::trace;
 
@@ -32,7 +33,7 @@ pub struct HttpClient<'a> {
 }
 
 impl<'a> HttpClient<'a> {
-    pub fn new<U>(base_url: U) -> Result<HttpClient<'a>, ParseError>
+    pub fn new<U>(base_url: U) -> Result<HttpClient<'a>, UrlParseError>
     where
         U: AsRef<str>,
     {
@@ -225,8 +226,12 @@ impl HttpClient<'_> {
         Request::new(url)
     }
 
-    pub fn new_request_with_url(&self, url: Url) -> Request {
-        Request::new(url)
+    pub fn new_request_with_url<U>(&self, url: U) -> Result<Request, UrlParseError>
+    where
+        U: AsRef<str>,
+    {
+        let url = Url::parse(url.as_ref())?;
+        Ok(Request::new(url))
     }
 }
 

@@ -1,5 +1,5 @@
+use chipp_http::HttpClient;
 use futures_executor::block_on;
-use http_client::HttpClient;
 
 #[test]
 fn test_get() {

@@ -78,3 +78,25 @@ impl fmt::Display for Error {
         }
     }
 }
+
+pub struct UrlParseError(url::ParseError);
+
+impl From<url::ParseError> for UrlParseError {
+    fn from(error: url::ParseError) -> UrlParseError {
+        UrlParseError(error)
+    }
+}
+
+impl fmt::Debug for UrlParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "UrlParseError: {}", self.0)
+    }
+}
+
+impl fmt::Display for UrlParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "UrlParseError: {}", self.0)
+    }
+}
+
+impl StdError for UrlParseError {}
