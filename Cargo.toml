@@ -1,6 +1,6 @@
 [package]
 name = "chipp_http"
-version = "1.0.1"
+version = "1.0.2"
 description = "curl-based HTTP client library"
 repository = "https://github.com/chipp/http_client"
 license = "MIT"
