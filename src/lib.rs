@@ -1,7 +1,6 @@
 use std::thread;
 use std::{borrow::Borrow, str};
 
-use error::UrlParseError;
 use futures_channel::oneshot;
 
 use ::curl::easy::{Easy, Form, List};
@@ -24,7 +23,7 @@ pub mod curl {
 pub mod json;
 
 mod error;
-pub use error::{Error, ErrorKind};
+pub use error::{Error, ErrorKind, UrlParseError};
 
 pub struct HttpClient<'a> {
     base_url: Url,
