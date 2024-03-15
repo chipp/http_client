@@ -21,3 +21,4 @@ endif
 	@git tag $(NEXT_VERSION)
 	@git push origin main
 	@git push origin $(NEXT_VERSION)
+	@cargo publish
