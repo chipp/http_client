@@ -1,6 +1,6 @@
 use chipp_http::{ErrorKind, HttpClient, HttpMethod};
 use futures_executor::block_on;
-use serde_derive::Deserialize;
+use serde::Deserialize;
 
 #[test]
 fn test_404() {

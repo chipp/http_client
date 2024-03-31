@@ -25,14 +25,30 @@ pub mod json;
 mod error;
 pub use error::{Error, ErrorKind, UrlParseError};
 
-pub struct HttpClient<'a> {
-    base_url: Url,
-    default_headers: Option<Vec<(String, String)>>,
-    interceptor: Option<Box<dyn Fn(&mut Easy) + Send + Sync + 'a>>,
+pub trait Interceptor {
+    fn modify(&self, easy: &mut Easy);
 }
 
-impl<'a> HttpClient<'a> {
-    pub fn new<U>(base_url: U) -> Result<HttpClient<'a>, UrlParseError>
+pub struct NoInterceptor;
+
+impl Interceptor for NoInterceptor {
+    fn modify(&self, _: &mut Easy) {}
+}
+
+impl<T: Fn(&mut Easy)> Interceptor for T {
+    fn modify(&self, easy: &mut Easy) {
+        self(easy)
+    }
+}
+
+pub struct HttpClient<I: Interceptor> {
+    base_url: Url,
+    default_headers: Option<Vec<(String, String)>>,
+    interceptor: I,
+}
+
+impl HttpClient<NoInterceptor> {
+    pub fn new<U>(base_url: U) -> Result<HttpClient<NoInterceptor>, UrlParseError>
     where
         U: AsRef<str>,
     {
@@ -40,8 +56,21 @@ impl<'a> HttpClient<'a> {
         Ok(HttpClient {
             base_url,
             default_headers: None,
-            interceptor: None,
+            interceptor: NoInterceptor,
         })
+    }
+}
+
+impl<X: Interceptor> HttpClient<X> {
+    pub fn with_interceptor<O>(self, interceptor: O) -> HttpClient<O>
+    where
+        O: Interceptor,
+    {
+        HttpClient {
+            base_url: self.base_url,
+            default_headers: self.default_headers,
+            interceptor,
+        }
     }
 
     pub fn set_default_headers<H, K, V>(&mut self, headers: H)
@@ -60,16 +89,9 @@ impl<'a> HttpClient<'a> {
 
         self.default_headers = Some(default_headers)
     }
-
-    pub fn set_interceptor<F>(&mut self, interceptor: F)
-    where
-        F: Fn(&mut Easy) + Send + Sync + 'a,
-    {
-        self.interceptor = Some(Box::new(interceptor))
-    }
 }
 
-impl HttpClient<'_> {
+impl<X: Interceptor> HttpClient<X> {
     fn prepare_url_with_path<P>(&self, path: P) -> Url
     where
         P: IntoIterator,
@@ -128,12 +150,7 @@ impl HttpClient<'_> {
 
         easy.http_headers(headers).unwrap();
 
-        {
-            match self.interceptor {
-                Some(ref interceptor) => &interceptor(&mut easy),
-                None => &(),
-            };
-        }
+        self.interceptor.modify(&mut easy);
 
         thread::spawn(move || {
             let mut body = Vec::new();
@@ -201,7 +218,7 @@ impl HttpClient<'_> {
     }
 }
 
-impl HttpClient<'_> {
+impl<X: Interceptor> HttpClient<X> {
     pub fn new_request<P>(&self, path: P) -> Request
     where
         P: IntoIterator,

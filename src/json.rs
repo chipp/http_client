@@ -1,8 +1,8 @@
-use super::{Error, HttpClient, Request, Response};
+use super::{Error, HttpClient, Interceptor, Request, Response};
 use serde::de::DeserializeOwned;
 use serde_json;
 
-impl HttpClient<'_> {
+impl<X: Interceptor> HttpClient<X> {
     pub async fn get<R, P>(&self, path: P) -> Result<R, Error>
     where
         R: DeserializeOwned + Send + 'static,

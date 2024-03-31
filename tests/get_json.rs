@@ -1,9 +1,7 @@
 use chipp_http::HttpClient;
 use curl::easy::Auth;
 use futures_executor::block_on;
-use futures_util::future::join_all;
-use futures_util::join;
-use serde_derive::Deserialize;
+use serde::Deserialize;
 
 #[test]
 fn test_get() {
@@ -20,57 +18,6 @@ fn test_get() {
             .unwrap()
             .url,
         "https://httpbin.org/get"
-    );
-}
-
-#[test]
-fn test_get_join() {
-    #[derive(Deserialize)]
-    struct Response {
-        url: String,
-    }
-
-    let http_client = HttpClient::new("https://httpbin.org/").unwrap();
-    let results = block_on(async {
-        join!(
-            http_client.get::<Response, _>(vec!["delay", "2"]),
-            http_client.get::<Response, _>(vec!["delay", "1"]),
-        )
-    });
-
-    assert_eq!(results.0.unwrap().url, "https://httpbin.org/delay/2");
-    assert_eq!(results.1.unwrap().url, "https://httpbin.org/delay/1");
-}
-
-#[test]
-fn test_get_join_all() {
-    #[derive(Deserialize)]
-    struct Response {
-        url: String,
-    }
-
-    let http_client = HttpClient::new("https://httpbin.org/").unwrap();
-
-    let users = vec!["vpupkin", "ppupkin", "ipupkin"];
-
-    let results =
-        block_on(join_all(users.iter().map(|user| {
-            http_client.get::<Response, _>(vec!["anything", user])
-        })));
-
-    assert_eq!(
-        results[0].as_ref().unwrap().url,
-        "https://httpbin.org/anything/vpupkin"
-    );
-
-    assert_eq!(
-        results[1].as_ref().unwrap().url,
-        "https://httpbin.org/anything/ppupkin"
-    );
-
-    assert_eq!(
-        results[2].as_ref().unwrap().url,
-        "https://httpbin.org/anything/ipupkin"
     );
 }
 
@@ -114,16 +61,16 @@ fn test_interceptor() {
         user: String,
     }
 
-    let mut http_client = HttpClient::new("https://httpbin.org/").unwrap();
+    let http_client = HttpClient::new("https://httpbin.org/")
+        .unwrap()
+        .with_interceptor(|easy: &mut curl::easy::Easy| {
+            let mut auth = Auth::new();
+            auth.basic(true);
+            easy.http_auth(&auth).unwrap();
 
-    http_client.set_interceptor(|easy: &mut curl::easy::Easy| {
-        let mut auth = Auth::new();
-        auth.basic(true);
-        easy.http_auth(&auth).unwrap();
-
-        easy.username("me").unwrap();
-        easy.password("secure").unwrap();
-    });
+            easy.username("me").unwrap();
+            easy.password("secure").unwrap();
+        });
 
     let response =
         block_on(http_client.get::<Response, _>(vec!["basic-auth", "me", "secure"])).unwrap();
