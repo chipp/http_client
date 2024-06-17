@@ -26,19 +26,22 @@ mod error;
 pub use error::{Error, ErrorKind, UrlParseError};
 
 pub trait Interceptor {
-    fn modify(&self, easy: &mut Easy);
+    fn modify(&self, easy: &mut Easy, request: &Request);
+    fn add_headers(&self, headers: &mut List, request: &Request);
 }
 
 pub struct NoInterceptor;
 
 impl Interceptor for NoInterceptor {
-    fn modify(&self, _: &mut Easy) {}
+    fn modify(&self, _: &mut Easy, _: &Request) {}
+    fn add_headers(&self, _: &mut List, _: &Request) {}
 }
 
-impl<T: Fn(&mut Easy)> Interceptor for T {
-    fn modify(&self, easy: &mut Easy) {
-        self(easy)
+impl<T: Fn(&mut Easy, &Request)> Interceptor for T {
+    fn modify(&self, easy: &mut Easy, request: &Request) {
+        self(easy, request)
     }
+    fn add_headers(&self, _: &mut List, _: &Request) {}
 }
 
 pub struct HttpClient<I: Interceptor> {
@@ -148,9 +151,10 @@ impl<X: Interceptor> HttpClient<X> {
             add_headers_to_list(request_headers, &mut headers);
         }
 
+        self.interceptor.add_headers(&mut headers, &request);
         easy.http_headers(headers).unwrap();
 
-        self.interceptor.modify(&mut easy);
+        self.interceptor.modify(&mut easy, &request);
 
         thread::spawn(move || {
             let mut body = Vec::new();

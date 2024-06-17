@@ -1,4 +1,4 @@
-use chipp_http::HttpClient;
+use chipp_http::{HttpClient, Interceptor, Request};
 use curl::easy::Auth;
 use futures_executor::block_on;
 use serde::Deserialize;
@@ -63,7 +63,7 @@ fn test_interceptor() {
 
     let http_client = HttpClient::new("https://httpbin.org/")
         .unwrap()
-        .with_interceptor(|easy: &mut curl::easy::Easy| {
+        .with_interceptor(|easy: &mut curl::easy::Easy, _: &Request| {
             let mut auth = Auth::new();
             auth.basic(true);
             easy.http_auth(&auth).unwrap();
@@ -87,7 +87,6 @@ fn test_default_headers() {
     }
 
     let mut http_client = HttpClient::new("https://httpbin.org/").unwrap();
-
     http_client.set_default_headers(&[("Authorization", "Bearer kek")]);
 
     let response = block_on(http_client.get::<Response, _>(vec!["get"])).unwrap();
@@ -95,5 +94,70 @@ fn test_default_headers() {
     assert_eq!(
         response.headers.get("Authorization"),
         Some(&"Bearer kek".to_owned())
+    );
+}
+
+#[test]
+fn test_request_headers() {
+    #[derive(Deserialize)]
+    struct Response {
+        headers: std::collections::HashMap<String, String>,
+    }
+
+    let mut http_client = HttpClient::new("https://httpbin.org/").unwrap();
+    http_client.set_default_headers(&[("Authorization", "Bearer default")]);
+
+    let mut request = http_client.new_request(["get"]);
+    request.headers = Some(vec![("X-Kek-Id".to_string(), "123".to_string())]);
+
+    let response =
+        block_on(http_client.perform_request::<Response, _>(request, chipp_http::json::parse_json))
+            .unwrap();
+
+    assert_eq!(
+        response.headers.get("Authorization"),
+        Some(&"Bearer default".to_owned())
+    );
+
+    assert_eq!(response.headers.get("X-Kek-Id"), Some(&"123".to_owned()));
+}
+
+#[test]
+fn test_interceptor_headers() {
+    struct Authenticator;
+
+    impl Interceptor for Authenticator {
+        fn modify(&self, _: &mut curl::easy::Easy, _: &Request) {}
+
+        fn add_headers(&self, headers: &mut curl::easy::List, _: &Request) {
+            headers
+                .append(&format!("X-Interceptor: intercepted"))
+                .unwrap();
+        }
+    }
+
+    #[derive(Deserialize)]
+    struct Response {
+        headers: std::collections::HashMap<String, String>,
+    }
+
+    let mut http_client = HttpClient::new("https://httpbin.org/")
+        .unwrap()
+        .with_interceptor(Authenticator);
+    http_client.set_default_headers(&[("Authorization", "Bearer default")]);
+
+    let request = http_client.new_request(["get"]);
+    let response =
+        block_on(http_client.perform_request::<Response, _>(request, chipp_http::json::parse_json))
+            .unwrap();
+
+    assert_eq!(
+        response.headers.get("Authorization"),
+        Some(&"Bearer default".to_owned())
+    );
+
+    assert_eq!(
+        response.headers.get("X-Interceptor"),
+        Some(&"intercepted".to_owned())
     );
 }
